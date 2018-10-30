@@ -1,0 +1,90 @@
+(add-cflag "-O3")
+(use-all Array Set)
+
+; Set.filter impl that returns an array
+(defmodule Set
+  (defn filter [f s]
+    (let-do [a []]
+      (for [i 0 @(n-buckets s)]
+        (let [bucket (Array.nth (buckets s) i)
+              len (Array.length (SetBucket.entries bucket))
+              entries (SetBucket.entries bucket)]
+          (for [j 0 len]
+            (let [e (Array.nth entries j)]
+              (when (f e)
+                (set! a (push-back a @e)))))))
+      a))
+)
+
+(deftype Leg [day String start String end String])
+
+(defmodule Leg
+  ; N.B. we’re throwing away the ID for now
+  (defn from-string [s]
+    (let [arr (words s)]
+      (Leg.init @(nth &arr 3) @(nth &arr 1) @(nth &arr 2))))
+)
+
+(def days [@"M" @"T" @"W" @"R" @"F"])
+
+(def next-days {
+  @"M" @"T"
+  @"T" @"W"
+  @"W" @"R"
+  @"R" @"F"
+})
+
+(defn next-day [d]
+  (Map.get &next-days d))
+
+(deftype Route [identifier Int legs (Array Leg)])
+
+(defmodule Route
+  (def ID 0)
+
+  (defn singleton [l]
+    (do
+      (set! ID (Int.inc ID))
+      (Route.init ID [@l])))
+
+  (defn viable? [d r]
+    (= (next-day (Leg.day &(last (legs r)))) d))
+
+  (defn add-leg [r l]
+    (Route.update-legs r (fn [legs] (push-back legs @l))))
+
+  (defn hash [r]
+    @(identifier r))
+
+  (defn = [r1 r2]
+    (= (identifier r1) (identifier r2)))
+)
+
+(defn legs-for [legs d]
+  (filter (fn [leg] (= (Leg.day leg) d)) @legs))
+
+(defn solve-leg [d routes leg]
+  (let [viable (Set.filter (fn [r] (Route.viable? @d r)) routes)]
+    (if (= (length &viable) 0)
+      (put routes &(Route.singleton leg))
+      (let [fst (first &viable)]
+        (put &(remove @routes &fst) &(Route.add-leg fst leg))))))
+
+(defn solve-on [d routes legs]
+  (reduce (fn [routes leg] (solve-leg d routes leg)) routes &legs))
+
+(defn solve [legs]
+  (let-do [res (Set.create)]
+    (for [i 0 (length &days)]
+      (let [day (nth &days i)]
+        (set! res (solve-on day res (legs-for &legs day)))))
+    res))
+
+(defn make-legs [ls]
+  (copy-map Leg.from-string &(filter (fn [s] (not (String.empty? s))) ls)))
+
+(defn main []
+  (let [ls (lines &(IO.read-file "legs.txt"))
+        legs (make-legs ls)
+       ]
+    (IO.println &(str (length &(solve legs))))))
