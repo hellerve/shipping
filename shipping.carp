@@ -1,10 +1,10 @@
 (add-cflag "-O3")
 (use-all Array Set)
 
-; Set.filter impl that returns an array
+; Set.filter impl that returns the first viable thing
 (defmodule Set
   (defn filter [f s]
-    (let-do [a []]
+    (let-do [a (zero)]
       (for [i 0 @(n-buckets s)]
         (let [bucket (Array.nth (buckets s) i)
               len (Array.length (SetBucket.entries bucket))
@@ -12,35 +12,34 @@
           (for [j 0 len]
             (let [e (Array.nth entries j)]
               (when (f e)
-                (set! a (push-back a @e)))))))
+                (do
+                  (set! a @e)
+                  (break)))))))
       a))
 )
 
-(deftype Leg [day String start String end String])
+(deftype Leg [day Char start String end String])
 
 (defmodule Leg
   ; N.B. we’re throwing away the ID for now
   (defn from-string [s]
     (let [arr (words s)]
-      (Leg.init @(nth &arr 3) @(nth &arr 1) @(nth &arr 2))))
+      (Leg.init (head (nth &arr 3)) @(nth &arr 1) @(nth &arr 2))))
 )
 
-(def days [@"M" @"T" @"W" @"R" @"F"])
-
-(def next-days {
-  @"M" @"T"
-  @"T" @"W"
-  @"W" @"R"
-  @"R" @"F"
-})
+(def days [\M \T \W \R \F])
 
 (defn next-day [d]
-  (Map.get &next-days d))
+  (let [i (index-of &days d)]
+    @(nth &days (Int.inc i))))
 
 (deftype Route [identifier Int legs (Array Leg)])
 
 (defmodule Route
   (def ID 0)
+
+  (defn zero []
+    (Route.init 0 []))
 
   (defn singleton [l]
     (do
@@ -48,7 +47,8 @@
       (Route.init ID [@l])))
 
   (defn viable? [d r]
-    (= (next-day (Leg.day &(last (legs r)))) d))
+    (let [l (legs r)]
+      (= (next-day @(Leg.day (nth l (Int.dec (length l))))) d)))
 
   (defn add-leg [r l]
     (Route.update-legs r (fn [legs] (push-back legs @l))))
@@ -64,18 +64,17 @@
   (filter (fn [leg] (= (Leg.day leg) d)) @legs))
 
 (defn solve-leg [d routes leg]
-  (let [viable (Set.filter (fn [r] (Route.viable? @d r)) routes)]
-    (if (= (length &viable) 0)
-      (put routes &(Route.singleton leg))
-      (let [fst (first &viable)]
-        (put &(remove @routes &fst) &(Route.add-leg fst leg))))))
+  (let [viable (Set.filter (fn [r] (Route.viable? @d r)) &routes)]
+    (if (= &viable &(zero))
+      (put! routes &(Route.singleton leg))
+      (put! (remove! routes &viable) &(Route.add-leg viable leg)))))
 
 (defn solve-on [d routes legs]
   (reduce (fn [routes leg] (solve-leg d routes leg)) routes &legs))
 
 (defn solve [legs]
   (let-do [res (Set.create)]
-    (for [i 0 (length &days)]
+    (for [i 0 (Int.dec (length &days))]
       (let [day (nth &days i)]
         (set! res (solve-on day res (legs-for &legs day)))))
     res))
