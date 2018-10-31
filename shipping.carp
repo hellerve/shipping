@@ -66,8 +66,8 @@
 (defn solve-leg [d routes leg]
   (let [viable (Set.filter (fn [r] (Route.viable? @d r)) &routes)]
     (if (= &viable &(zero))
-      (put! routes &(Route.singleton leg))
-      (put! (remove! routes &viable) &(Route.add-leg viable leg)))))
+      (put routes &(Route.singleton leg))
+      (put (remove routes &viable) &(Route.add-leg viable leg)))))
 
 (defn solve-on [d routes legs]
   (reduce (fn [routes leg] (solve-leg d routes leg)) routes &legs))
