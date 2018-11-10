@@ -4,7 +4,7 @@
 ; Set.filter impl that returns the first viable thing
 (defmodule Set
   (defn filter [f s]
-    (let-do [a (zero)]
+    (let-do [a &(zero)]
       (for [i 0 @(n-buckets s)]
         (let [bucket (Array.nth (buckets s) i)
               len (Array.length (SetBucket.entries bucket))
@@ -13,9 +13,9 @@
             (let [e (Array.nth entries j)]
               (when (f e)
                 (do
-                  (set! a @e)
+                  (set! a e)
                   (break)))))))
-      a))
+      @a))
 )
 
 (deftype Leg [day Char start String end String])
@@ -31,7 +31,9 @@
 
 (defn next-day [d]
   (let [i (index-of &days d)]
-    @(nth &days (Int.inc i))))
+    (if (< i 5)
+      @(nth &days (Int.inc i))
+      \X)))
 
 (deftype Route [identifier Int legs (Array Leg)])
 
@@ -46,9 +48,10 @@
       (set! ID (Int.inc ID))
       (Route.init ID [@l])))
 
-  (defn viable? [d r]
-    (let [l (legs r)]
-      (= (next-day @(Leg.day (nth l (Int.dec (length l))))) d)))
+  (defn viable? [d r s]
+    (let [ls (legs r)
+          l (nth ls (Int.dec (length ls)))]
+      (and (= (next-day @(Leg.day l)) d) (= s (Leg.end l)))))
 
   (defn add-leg [r l]
     (Route.update-legs r (fn [legs] (push-back legs @l))))
@@ -58,13 +61,16 @@
 
   (defn = [r1 r2]
     (= (identifier r1) (identifier r2)))
+
+  (defn prn [r]
+    (str r))
 )
 
 (defn legs-for [legs d]
   (filter (fn [leg] (= (Leg.day leg) d)) @legs))
 
 (defn solve-leg [d routes leg]
-  (let [viable (Set.filter (fn [r] (Route.viable? @d r)) &routes)]
+  (let [viable (Set.filter (fn [r] (Route.viable? @d r (Leg.start leg))) &routes)]
     (if (= &viable &(zero))
       (put routes &(Route.singleton leg))
       (put (remove routes &viable) &(Route.add-leg viable leg)))))
@@ -74,7 +80,7 @@
 
 (defn solve [legs]
   (let-do [res (Set.create)]
-    (for [i 0 (Int.dec (length &days))]
+    (for [i 0 (length &days)]
       (let [day (nth &days i)]
         (set! res (solve-on day res (legs-for &legs day)))))
     res))
@@ -83,7 +89,9 @@
   (copy-map Leg.from-string &(filter (fn [s] (not (String.empty? s))) ls)))
 
 (defn main []
-  (let [ls (lines &(IO.read-file "legs.txt"))
-        legs (make-legs ls)
-       ]
-    (IO.println &(str (length &(solve legs))))))
+  (let-do [ls (lines &(IO.read-file "legs.txt"))
+           legs (make-legs ls)
+           then (System.nanotime)
+          ]
+    (IO.println &(str (length &(solve @&legs))))
+    (println* "Solving took " (/ (- (System.nanotime) then) 1000000l) " milliseconds")))
